@@ -1,5 +1,6 @@
 from functools import reduce
 from hashlib import sha256
+from random import shuffle
 from elliptic_curve import EllipticCurve, ECCPoint
 from itertools import combinations_with_replacement
 from utils import get_random_relatively_prime_value, generate_random_rsa_key, hash_array_of_points, generate_tuple
@@ -153,6 +154,7 @@ class VotingServer:
         return chall == sum(u)
     
     def open_vote(self) -> list[int]:
+        shuffle(self.votes)
         elliptic_curve = self.elliptic_curve
         sum_A = ECCPoint(0, 0, True)
         sum_B = ECCPoint(0, 0, True)
@@ -195,12 +197,20 @@ class VotingServer:
         
 if __name__ == '__main__':
     from random import randint
-    voting_server = VotingServer(number_of_candidate = 2, maximum_number_of_voter = 20)
-    for i in range(10):
+    import time
+    number_of_candidate = 4
+    voting_server = VotingServer(number_of_candidate = 4, maximum_number_of_voter = 300)
+    cnt = [0 for i in range(number_of_candidate)]
+    now = time.time()
+    for i in range(200):
         user = User()
-        vote = randint(0, 1)
+        vote = randint(0, number_of_candidate - 1)
+        cnt[vote] += 1
         user_vote = user.vote(vote, voting_server.get_public_key())
         voting_server.cast_vote(user_vote)
-        print(vote)
-    print(voting_server.number_of_voter)
-    print(voting_server.open_vote())
+    
+    print(f"Preprocess time: {time.time() - now}")
+    now = time.time()
+    print(cnt)
+    print(voting_server.open_vote() == cnt)
+    print(f"Opening vote time: {time.time() - now}")
