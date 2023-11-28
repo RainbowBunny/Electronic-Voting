@@ -80,6 +80,15 @@ class VotingServer:
         self.maximum_number_of_voters = maximum_number_of_voter
         self.set_up()
         self.votes = []
+        self.election_data = {
+            "voter_public_key": [],
+            "voter_vote": [],
+            "voter_signed_message": [],
+            "voter_prove_of_work": [],
+            "encrypted_package": [],
+            "decrypted_package": [],
+            "result_package": []
+        }
 
     def set_up(self):
         self.elliptic_curve = EllipticCurve(
@@ -122,6 +131,10 @@ class VotingServer:
         if self.verify_vote(encrypted_message, prove_of_work):
             self.number_of_voter += 1
             self.votes.append(encrypted_message)
+            self.election_data["voter_vote"].append(encrypted_message)
+            self.election_data["voter_signed_message"].append(signed_message)
+            self.election_data["voter_public_key"].append(public_key)
+            self.election_data["voter_prove_of_work"].append(prove_of_work)
     
     def verify_message(self, message: int, signed_message: int, public_key: (int, int)) -> bool:
         n, e = public_key
@@ -154,7 +167,6 @@ class VotingServer:
         return chall == sum(u)
     
     def open_vote(self) -> list[int]:
-        shuffle(self.votes)
         elliptic_curve = self.elliptic_curve
         sum_A = ECCPoint(0, 0, True)
         sum_B = ECCPoint(0, 0, True)
@@ -162,12 +174,17 @@ class VotingServer:
             sum_A = elliptic_curve.add(sum_A, vote[0])
             sum_B = elliptic_curve.add(sum_B, vote[1])
         
+        self.election_data["encrypted_package"].append((sum_A, sum_B))
         decrypted_S = elliptic_curve.sub(
             sum_B,
             elliptic_curve.multiply(self.d, sum_A)
         )
+        self.election_data["decrypted_package"].append(decrypted_S)
 
-        return self.solve(decrypted_S, self.M, self.number_of_voter)
+        self.results = self.solve(decrypted_S, self.M, self.number_of_voter)
+        self.election_data["result_package"].append(self.results)
+        self.election_data["results"] = self.results
+        return self.results
     
     def solve(self, decrypted_S: ECCPoint, M: list[ECCPoint], n: int) -> list[int]:
         elliptic_curve = self.elliptic_curve
@@ -194,9 +211,13 @@ class VotingServer:
                 return data[n - cur_sum][target] + tuple
         
         return None
+    
+    def public_result(self):
+        return self.election_data
         
 if __name__ == '__main__':
     from random import randint
+    from pprint import pprint
     import time
     number_of_candidate = 4
     voting_server = VotingServer(number_of_candidate = 4, maximum_number_of_voter = 300)
@@ -214,3 +235,4 @@ if __name__ == '__main__':
     print(cnt)
     print(voting_server.open_vote() == cnt)
     print(f"Opening vote time: {time.time() - now}")
+    pprint(voting_server.public_result())
